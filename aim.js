@@ -1,6 +1,5 @@
 
 function AimAid(name,_param = []) {
-    outer = this;
     this.name = name;
     this.angle = 0;
     this.radius = 100;
@@ -12,13 +11,14 @@ function AimAid(name,_param = []) {
     this.parameters = _param;
     this.controls = _param.map(e => {
         const div  = document.createElement("div");
+        div.classList.add("slider");
         const elem = document.createElement("input");
         const disp = document.createElement("span");
         elem.type = "range";
         elem.value = e.initialSlider;
         elem.addEventListener("change", ev => {
-            outer[e.name] = e.trans(elem.value)
-            disp.innerHTML = outer[e.name].toLocaleString("en",
+            this[e.name] = e.trans(elem.value)
+            disp.innerHTML = this[e.name].toLocaleString("en",
                 maximumFractionalDigits=3,
                 minimumFractionalDigits=3
             );
@@ -38,16 +38,22 @@ function AimAid(name,_param = []) {
         this.canvas.style.width = this.width + "px";
         this.canvas.style.height = this.width + "px";
 
-        document.addEventListener('mousemove', e => this.update(e.movementX, e.movementY));
-        this.canvas.addEventListener('click', function(e) {
-            this.canvas.requestPointerLock();
-            console.log("request " + this.name);
+        this.canvas.addEventListener('mousemove', e => this.update(e.movementX, e.movementY));
+        this.canvas.addEventListener('click', e => {
+            if(document.pointerLockElement == this.canvas){
+                document.exitPointerLock();
+                this.canvas.classList.remove("locked");
+            } else {
+                this.canvas.requestPointerLock();
+                this.canvas.classList.add("locked");
+            }
         });
     }
 
     //create widget
     this.widget = document.createElement("div");
     {
+        this.widget.classList.add("widget");
         const heading = document.createElement("h2");
         heading.innerHTML = this.name;
         this.widget.appendChild(heading);
@@ -96,16 +102,17 @@ AimAid.prototype.draw   = function() {
     );
 };
 
+const p_sensitivity = {   
+    "name": "sensitivity",
+    "trans": function(x) 0.01 * Math.pow(10,(x - 50) / 25),
+    "initialSlider": 50
+}
 
 //here come the implementations
 const aidDescs = [
     {
         "name": "Normal Projection",
-        "params": [{
-            "name": "sensitivity",
-            "trans": function(x) 0.01 * Math.pow(10,(x - 50) / 25),
-            "initialSlider": 50
-        }],
+        "params": [p_sensitivity],
         "updateDT": function(dT,mdx,mdy) {
             const perpX = -1 * Math.sin(this.angle);
             const perpY = Math.cos(this.angle);
@@ -118,24 +125,34 @@ const aidDescs = [
     {
         "name": "Normal Projection with Momentum",
         "params": [
-            {   
-                "name": "sensitivity",
-                "trans": function(x) 0.01 * Math.pow(10,(x - 50) / 25),
-                "initialSlider": 50
-            },
+            p_sensitivity,
             {
-                "name": "momentum",
-                "trans": function(x) 0.01 * Math.pow(10,(x - 50) / 25),
+                "name": "decay",
+                "trans": function(x) x/100,
                 "initialSlider": 50
             }
         ],
         "updateDT": function(dT,mdx,mdy) {
+            this.momentum = this.momentum || 0;
+
             const perpX = -1 * Math.sin(this.angle);
             const perpY = Math.cos(this.angle);
 
             const dadm = perpX * mdx + perpY * mdy;
 
-            this.angle = this.angle + dadm * this.sensitivity;
+            this.momentum = this.momentum * Math.pow(this.decay, dT) + dadm * this.sensitivity;
+
+            this.angle = this.angle + this.momentum;
+        }
+    },{
+        "name": "warp",
+        "params": [],
+        "updateDT": function(dT,mdx,mdy) {
+            this.r = this.r || 0;
+
+            const perpX = -1 * Math.sin(this.angle);
+            const perpY = Math.cos(this.angle);
+            const dadm = perpX * mdx + perpY * mdy;
         }
     }
 ]

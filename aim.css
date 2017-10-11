@@ -2,6 +2,6 @@ canvas {
     border-style : solid;
 }
 
-div .holder {
-    text-align: center;
+.locked {
+    border-color: #dd3333;
 }
